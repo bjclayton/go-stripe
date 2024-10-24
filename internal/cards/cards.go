@@ -1,4 +1,4 @@
-package card
+package cards
 
 import (
 	"errors"
@@ -20,10 +20,14 @@ type Transaction struct {
 	BankReturnCode      string
 }
 
-func (c *Card) CreatePaymentIntent(currency string, amount int) (*stripe.PaymentIntent, error, string) {
-	stripe.Key = c.Key
+func (c *Card) Charge(currency string, amount int) (*stripe.PaymentIntent, string, error) {
+	return c.CreatePaymentIntent(currency, amount)
+}
 
-	// Create payment intent
+func (c *Card) CreatePaymentIntent(currency string, amount int) (*stripe.PaymentIntent, string, error) {
+	stripe.Key = c.Secret
+
+	// create a payment intent
 	params := &stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(int64(amount)),
 		Currency: stripe.String(currency),
@@ -36,9 +40,9 @@ func (c *Card) CreatePaymentIntent(currency string, amount int) (*stripe.Payment
 		if errors.As(err, &stripeErr) {
 			msg = cardErrorMessage(stripeErr.Code)
 		}
-		return nil, err, msg
+		return nil, msg, err
 	}
-	return pi, nil, ""
+	return pi, "", nil
 }
 
 func cardErrorMessage(code stripe.ErrorCode) string {
