@@ -1,9 +1,10 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"net/http"
 )
 
 func (app *application) routes() http.Handler {
@@ -18,5 +19,8 @@ func (app *application) routes() http.Handler {
 	}))
 
 	mux.Post("/api/payment-intent", app.GetPaymentIntent)
+
+	mux.Get("/api/widget/{id}", app.GetWidgetByID)
+
 	return mux
 }

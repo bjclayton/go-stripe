@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go-stripe/internal/driver"
+	"go-stripe/internal/models"
 	"log"
 	"net/http"
 	"os"
@@ -24,15 +26,16 @@ type config struct {
 }
 
 type application struct {
-	config
+	config   config
 	infoLog  *log.Logger
 	errorLog *log.Logger
 	version  string
+	DB       models.DBModel
 }
 
 func (app *application) serve() error {
-	srv := http.Server{
-		Addr:              fmt.Sprintf(":%d", app.port),
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", app.config.port),
 		Handler:           app.routes(),
 		IdleTimeout:       30 * time.Second,
 		ReadTimeout:       10 * time.Second,
@@ -40,7 +43,8 @@ func (app *application) serve() error {
 		WriteTimeout:      5 * time.Second,
 	}
 
-	app.infoLog.Printf("Starting Back end server in %s mode on port %d\n", app.config.env, app.port)
+	app.infoLog.Printf("Starting Back end server in %s mode on port %d\n", app.config.env, app.config.port)
+
 	return srv.ListenAndServe()
 }
 
@@ -49,26 +53,32 @@ func main() {
 
 	flag.IntVar(&cfg.port, "port", 4001, "Server port to listen on")
 	flag.StringVar(&cfg.env, "env", "development", "Application environment {development|production|maintenance}")
-	flag.StringVar(&cfg.db.dsn, "dsn", "root@(localhost:3306)/widgets?parseTime=true&tls=false", "Database DSN")
+	flag.StringVar(&cfg.db.dsn, "dsn", "trevor:secret@tcp(localhost:3306)/widgets?parseTime=true&tls=false", "DSN")
 
 	flag.Parse()
 
-	cfg.stripe.secret = os.Getenv("STRIPE_SECRET")
 	cfg.stripe.key = os.Getenv("STRIPE_KEY")
+	cfg.stripe.secret = os.Getenv("STRIPE_SECRET")
 
 	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
-	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	errorLog := log.New(os.Stdout, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+
+	conn, err := driver.OpenDB(cfg.db.dsn)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+	defer conn.Close()
 
 	app := &application{
 		config:   cfg,
 		infoLog:  infoLog,
 		errorLog: errorLog,
 		version:  version,
+		DB:       models.DBModel{DB: conn},
 	}
 
-	err := app.serve()
+	err = app.serve()
 	if err != nil {
-		app.errorLog.Println(err)
 		log.Fatal(err)
 	}
 }
